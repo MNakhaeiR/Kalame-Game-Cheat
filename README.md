@@ -1,10 +1,10 @@
 ## Requirements
 
-pyautogui
-aiohttp
-asyncio
-requests
-pygetwindow
+- pyautogui
+- aiohttp
+- asyncio
+- requests
+- pygetwindow
 
 ## Run
 
