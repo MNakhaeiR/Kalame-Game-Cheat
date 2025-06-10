@@ -1,0 +1,5 @@
+pyautogui
+aiohttp
+asyncio
+requests
+pygetwindow
