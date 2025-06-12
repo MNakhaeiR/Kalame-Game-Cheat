@@ -94,20 +94,125 @@ def filter_words_by_letters(available_letters, min_length=3, allow_repetition=Tr
     valid_words.sort(key=len)
     return valid_words
 
-def get_vajeyab_words(letters):
+def validate_word_with_vajeyab(word, mock_mode=False):
     """
-    Get words from Vajeyab website (placeholder implementation)
-    In a real implementation, this would make API calls to vajeyab.com
+    Validate a single word using vajehyab.com
+    
+    Args:
+        word: The Persian word to validate
+        mock_mode: If True, use mock validation for testing (when vajehyab.com is unavailable)
+    
+    Returns:
+        True if the word is valid according to vajehyab.com, False otherwise
+    """
+    import requests
+    import urllib.parse
+    import time
+    
+    # Mock mode for testing when vajehyab.com is not accessible
+    if mock_mode:
+        # Mock some common Persian words as valid
+        common_words = {
+            'سلام', 'کتاب', 'نزدیک', 'درب', 'ابر', 'باد', 'دست', 'نان', 
+            'اسب', 'برادر', 'انسان', 'استاد', 'باران', 'دستبند'
+        }
+        is_valid = word in common_words
+        print(f"🧪 Mock validation for '{word}': {'✅ Valid' if is_valid else '❌ Invalid'}")
+        return is_valid
+    
+    try:
+        # URL encode the Persian word
+        encoded_word = urllib.parse.quote(word)
+        url = f'https://vajehyab.com/?q={encoded_word}'
+        
+        # Make request with timeout
+        response = requests.get(url, timeout=5)
+        
+        if response.status_code == 200:
+            # Check for indicators that the word is valid
+            # Look for common Persian dictionary indicators
+            content = response.text.lower()
+            
+            # These are common indicators that a word definition was found
+            valid_indicators = [
+                'معنی',  # meaning
+                'تعریف',  # definition  
+                'کلمه',   # word
+                'واژه',   # vocabulary
+                'اسم',    # noun
+                'فعل',    # verb
+                'صفت',    # adjective
+                'definition',
+                'meaning'
+            ]
+            
+            # Check if any valid indicators are present
+            for indicator in valid_indicators:
+                if indicator in content:
+                    print(f"✅ Valid word found on vajehyab: {word}")
+                    return True
+            
+            # If no indicators found, likely not a valid word
+            print(f"❌ Invalid word on vajehyab: {word}")
+            return False
+        else:
+            print(f"⚠️ vajehyab.com returned status {response.status_code} for word: {word}")
+            return False
+            
+    except Exception as e:
+        print(f"⚠️ Error validating word '{word}' with vajehyab.com: {e}")
+        return False
+
+def get_vajeyab_words(letters, max_candidates=100, mock_mode=False):
+    """
+    Get words from Vajeyab website by generating candidates and validating them
     
     Args:
         letters: Available letters
+        max_candidates: Maximum number of candidates to test (to avoid too many API calls)
+        mock_mode: If True, use mock validation for testing
     
     Returns:
-        List of words from Vajeyab
+        List of valid words from Vajeyab
     """
-    # Placeholder - in real implementation, would call Vajeyab API
-    # For now, return filtered words from our local dictionary
-    return filter_words_by_letters(letters, min_length=3, allow_repetition=True)
+    from itertools import product
+    import time
+    
+    print(f"🔍 Generating candidates from letters {letters} and validating with vajehyab.com...")
+    if mock_mode:
+        print("🧪 Using mock mode for testing")
+        
+    valid_words = []
+    candidates_tested = 0
+    
+    # Generate candidates of different lengths (3-6 letters for efficiency)
+    for length in range(3, min(7, len(letters) + 1)):
+        if candidates_tested >= max_candidates:
+            break
+            
+        print(f"📝 Testing {length}-letter combinations...")
+        
+        # Generate combinations with repetition allowed
+        for combo in product(letters, repeat=length):
+            if candidates_tested >= max_candidates:
+                break
+                
+            word = "".join(combo)
+            candidates_tested += 1
+            
+            print(f"[{candidates_tested}/{max_candidates}] Testing: {word}")
+            
+            # Validate with vajehyab.com (or mock)
+            if validate_word_with_vajeyab(word, mock_mode=mock_mode):
+                valid_words.append(word)
+                print(f"✅ Added valid word: {word}")
+            
+            # Small delay to be respectful to the server (only in real mode)
+            if not mock_mode:
+                time.sleep(0.1)
+    
+    print(f"🎯 Found {len(valid_words)} valid words from vajehyab.com out of {candidates_tested} candidates tested")
+    return valid_words
 
 if __name__ == "__main__":
     # Test the functions

@@ -148,58 +148,71 @@ class PersianWordBruteForceBot:
             return False
 
     def generate_smart_word_list(self):
-        """Generate smart word list prioritizing real Persian words (3+ letters with repetition allowed)"""
-        print("🧠 GENERATING SMART PERSIAN WORD LIST")
-        print("=" * 50)
+        """Generate smart word list prioritizing vajehyab-validated words (3+ letters with repetition allowed)"""
+        print("🧠 GENERATING SMART PERSIAN WORD LIST WITH VAJEHYAB VALIDATION")
+        print("=" * 70)
         
-        # Priority 1: Real Persian words that can be made from available letters
-        print("📚 Finding real Persian words...")
-        persian_words = filter_words_by_letters(
+        # Priority 1: Get words validated by vajehyab.com
+        print("🌐 Validating words with vajehyab.com...")
+        try:
+            vajehyab_words = get_vajeyab_words(self.current_letters, max_candidates=50)  # Limit to avoid too many API calls
+            print(f"✅ Found {len(vajehyab_words)} vajehyab-validated words")
+        except Exception as e:
+            print(f"⚠️ Error with vajehyab.com, falling back to local dictionary: {e}")
+            vajehyab_words = []
+        
+        # Priority 2: Local Persian words that can be made from available letters (as fallback)
+        print("📚 Finding local Persian words...")
+        local_persian_words = filter_words_by_letters(
             self.current_letters, 
             min_length=3,  # Changed from 2 to 3+ letters as requested
             allow_repetition=True  # Allow letter repetition as requested
         )
-        print(f"✅ Found {len(persian_words)} real Persian words")
+        # Only include local words that weren't already found by vajehyab
+        local_persian_words = [word for word in local_persian_words if word not in vajehyab_words]
+        print(f"✅ Found {len(local_persian_words)} additional local Persian words")
         
-        # Priority 2: Generate additional combinations with repetition allowed (limited for performance)
-        print("🔤 Generating additional combinations with letter repetition...")
-        additional_combinations = []
-        
-        # Limit combinations to avoid excessive generation
-        max_combinations_per_length = 1000  # Reasonable limit
-        
-        for length in range(3, 8):  # 3 to 7 letters (changed from 2)
-            print(f"📝 Generating {length}-letter combinations (max {max_combinations_per_length})...")
+        # Priority 3: Generate limited additional combinations if we don't have enough words
+        total_validated_words = len(vajehyab_words) + len(local_persian_words)
+        if total_validated_words < 20:  # Only generate additional if we have few validated words
+            print("🔤 Generating limited additional combinations...")
+            additional_combinations = []
             
-            count = 0
-            # Use product to allow repetition of letters
-            for combo in product(self.current_letters, repeat=length):
-                if count >= max_combinations_per_length:
-                    break
-                    
-                word = "".join(combo)
-                # Only add if not already in Persian words
-                if word not in persian_words:
-                    additional_combinations.append(word)
-                    count += 1
+            # Much more limited combinations since we prioritize validated words
+            max_combinations_per_length = 200  # Reduced limit
+            
+            for length in range(3, 6):  # Reduced range (3 to 5 letters)
+                print(f"📝 Generating {length}-letter combinations (max {max_combinations_per_length})...")
+                
+                count = 0
+                # Use product to allow repetition of letters
+                for combo in product(self.current_letters, repeat=length):
+                    if count >= max_combinations_per_length:
+                        break
+                        
+                    word = "".join(combo)
+                    # Only add if not already in validated words
+                    if word not in vajehyab_words and word not in local_persian_words:
+                        additional_combinations.append(word)
+                        count += 1
+            
+            # Remove duplicates from additional combinations
+            additional_combinations = list(set(additional_combinations))
+            print(f"🎯 Generated {len(additional_combinations)} additional combinations")
+        else:
+            additional_combinations = []
+            print("🎯 Skipping additional combinations - enough validated words found")
         
-        # Remove duplicates from additional combinations
-        additional_combinations = list(set(additional_combinations))
-        print(f"🎯 Generated {len(additional_combinations)} additional combinations")
-        
-        # Combine lists: Persian words first (priority), then additional combinations
-        all_words = list(persian_words) + additional_combinations
-        
-        # Sort by priority: Persian words first, then by length
-        persian_word_set = set(persian_words)
-        all_words.sort(key=lambda x: (x not in persian_word_set, len(x)))
+        # Combine lists with priority: vajehyab words first, then local Persian, then additional
+        all_words = list(vajehyab_words) + list(local_persian_words) + additional_combinations
         
         print(f"🚀 TOTAL WORD LIST: {len(all_words)} words")
-        print(f"📊 Real Persian words: {len(persian_words)}")
-        print(f"📊 Additional combinations: {len(additional_combinations)}")
+        print(f"🌐 Vajehyab-validated words: {len(vajehyab_words)}")
+        print(f"📚 Local Persian words: {len(local_persian_words)}")
+        print(f"🔤 Additional combinations: {len(additional_combinations)}")
         print(f"🎯 Letters can be repeated as requested")
         print(f"📏 Minimum word length: 3+ letters")
-        print(f"⚡ Optimized for practical use (max ~5K additional combinations)")
+        print(f"⚡ Prioritizes vajehyab.com validated words")
         
         return all_words
 
@@ -213,11 +226,11 @@ class PersianWordBruteForceBot:
             print("❌ No letters set! Use set_letters() first")
             return
 
-        print(f"\n🚀 STARTING SMART BRUTE FORCE ATTACK")
+        print(f"\n🚀 STARTING SMART BRUTE FORCE ATTACK WITH VAJEHYAB VALIDATION")
         print(f"📝 Letters: {' '.join(self.current_letters)}")
-        print("🧠 Using Persian word dictionary + combinations with repetition")
+        print("🌐 Prioritizing vajehyab.com validated words + Persian dictionary + combinations")
         print("📏 Minimum word length: 3+ letters")
-        print("=" * 50)
+        print("=" * 70)
 
         # Generate smart word list
         combinations = self.generate_smart_word_list()
@@ -545,9 +558,10 @@ if __name__ == "__main__":
         print("5. Test coordinates")
         print("6. Quick test word")
         print("7. Test Persian word generation")
-        print("8. Exit")
+        print("8. Test vajehyab.com integration")
+        print("9. Exit")
 
-        choice = input("\nSelect option (1-8): ").strip()
+        choice = input("\nSelect option (1-9): ").strip()
 
         if choice == "1":
             bot.setup_coordinates()
@@ -614,6 +628,37 @@ if __name__ == "__main__":
                 print("❌ Please enter exactly 7 letters")
 
         elif choice == "8":
+            # Test vajehyab.com integration
+            print("\n🌐 TESTING VAJEHYAB.COM INTEGRATION")
+            print("=" * 50)
+            
+            # Test single word validation
+            test_word = input("Enter a Persian word to test with vajehyab.com: ").strip()
+            if test_word:
+                from persian_words import validate_word_with_vajeyab
+                print(f"\n🔍 Testing word '{test_word}' with vajehyab.com...")
+                is_valid = validate_word_with_vajeyab(test_word)
+                if is_valid:
+                    print(f"✅ '{test_word}' is a valid word according to vajehyab.com")
+                else:
+                    print(f"❌ '{test_word}' is not recognized as a valid word by vajehyab.com")
+            
+            # Test with letters
+            letters = input("\nEnter letters to test vajehyab integration (optional): ").strip()
+            if letters:
+                print(f"\n🔍 Testing vajehyab word generation with letters: {letters}")
+                try:
+                    vajehyab_words = get_vajeyab_words(list(letters), max_candidates=10)  # Limited test
+                    if vajehyab_words:
+                        print(f"\n✅ Found {len(vajehyab_words)} validated words:")
+                        for i, word in enumerate(vajehyab_words, 1):
+                            print(f"{i}. {word}")
+                    else:
+                        print("❌ No valid words found or vajehyab.com unavailable")
+                except Exception as e:
+                    print(f"❌ Error testing vajehyab integration: {e}")
+
+        elif choice == "9":
             print("👋 Goodbye!")
             break
 
@@ -624,8 +669,9 @@ print("\n🎯 Tips for best results:")
 print("- Use delay of 0.2-0.5 seconds between words")
 print("- Make sure Telegram window stays focused")
 print("- Position coordinates accurately")
-print("- The bot now prioritizes real Persian words first! 📚")
+print("- The bot now prioritizes vajehyab.com validated words first! 🌐")
 print("- Letters can be repeated in words (as requested)")
 print("- Minimum word length is now 3+ letters")
 print("- Press Ctrl+C to stop brute force anytime")
 print("- Use option 7 to test Persian word generation")
+print("- Use option 8 to test vajehyab.com integration")
