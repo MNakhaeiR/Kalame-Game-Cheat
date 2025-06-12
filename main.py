@@ -1,8 +1,9 @@
 import pyautogui
 import time
-from itertools import permutations, combinations
+from itertools import permutations, combinations_with_replacement, product
 import threading
 from queue import Queue
+from persian_words import filter_words_by_letters, get_vajeyab_words, get_persian_words
 
 
 class PersianWordBruteForceBot:
@@ -146,28 +147,65 @@ class PersianWordBruteForceBot:
             print(f"❌ Error clicking sequence '{word}': {e}")
             return False
 
+    def generate_smart_word_list(self):
+        """Generate smart word list prioritizing real Persian words (3+ letters with repetition allowed)"""
+        print("🧠 GENERATING SMART PERSIAN WORD LIST")
+        print("=" * 50)
+        
+        # Priority 1: Real Persian words that can be made from available letters
+        print("📚 Finding real Persian words...")
+        persian_words = filter_words_by_letters(
+            self.current_letters, 
+            min_length=3,  # Changed from 2 to 3+ letters as requested
+            allow_repetition=True  # Allow letter repetition as requested
+        )
+        print(f"✅ Found {len(persian_words)} real Persian words")
+        
+        # Priority 2: Generate additional combinations with repetition allowed (limited for performance)
+        print("🔤 Generating additional combinations with letter repetition...")
+        additional_combinations = []
+        
+        # Limit combinations to avoid excessive generation
+        max_combinations_per_length = 1000  # Reasonable limit
+        
+        for length in range(3, 8):  # 3 to 7 letters (changed from 2)
+            print(f"📝 Generating {length}-letter combinations (max {max_combinations_per_length})...")
+            
+            count = 0
+            # Use product to allow repetition of letters
+            for combo in product(self.current_letters, repeat=length):
+                if count >= max_combinations_per_length:
+                    break
+                    
+                word = "".join(combo)
+                # Only add if not already in Persian words
+                if word not in persian_words:
+                    additional_combinations.append(word)
+                    count += 1
+        
+        # Remove duplicates from additional combinations
+        additional_combinations = list(set(additional_combinations))
+        print(f"🎯 Generated {len(additional_combinations)} additional combinations")
+        
+        # Combine lists: Persian words first (priority), then additional combinations
+        all_words = list(persian_words) + additional_combinations
+        
+        # Sort by priority: Persian words first, then by length
+        persian_word_set = set(persian_words)
+        all_words.sort(key=lambda x: (x not in persian_word_set, len(x)))
+        
+        print(f"🚀 TOTAL WORD LIST: {len(all_words)} words")
+        print(f"📊 Real Persian words: {len(persian_words)}")
+        print(f"📊 Additional combinations: {len(additional_combinations)}")
+        print(f"🎯 Letters can be repeated as requested")
+        print(f"📏 Minimum word length: 3+ letters")
+        print(f"⚡ Optimized for practical use (max ~5K additional combinations)")
+        
+        return all_words
+
     def generate_all_combinations(self):
-        """Generate all possible combinations (2-7 letters)"""
-        all_combinations = []
-
-        for length in range(2, 8):  # 2 to 7 letters
-            print(f"📝 Generating {length}-letter combinations...")
-
-            # All combinations of this length
-            for combo in combinations(self.current_letters, length):
-                # All permutations of this combination
-                for perm in permutations(combo):
-                    word = "".join(perm)
-                    all_combinations.append(word)
-
-        # Remove duplicates
-        unique_combinations = list(set(all_combinations))
-
-        # Sort by length (shorter first for faster discovery)
-        unique_combinations.sort(key=len)
-
-        print(f"🎯 Generated {len(unique_combinations)} unique combinations")
-        return unique_combinations
+        """Legacy method - now calls the smart word generation"""
+        return self.generate_smart_word_list()
 
     def brute_force_attack(self, delay_between_words=0.3):
         """Brute force all possible combinations"""
@@ -175,12 +213,14 @@ class PersianWordBruteForceBot:
             print("❌ No letters set! Use set_letters() first")
             return
 
-        print(f"\n🚀 STARTING BRUTE FORCE ATTACK")
+        print(f"\n🚀 STARTING SMART BRUTE FORCE ATTACK")
         print(f"📝 Letters: {' '.join(self.current_letters)}")
+        print("🧠 Using Persian word dictionary + combinations with repetition")
+        print("📏 Minimum word length: 3+ letters")
         print("=" * 50)
 
-        # Generate all combinations
-        combinations = self.generate_all_combinations()
+        # Generate smart word list
+        combinations = self.generate_smart_word_list()
 
         self.is_running = True
         successful_attempts = 0
@@ -193,7 +233,8 @@ class PersianWordBruteForceBot:
                 if word in self.tried_combinations:
                     continue
 
-                print(f"[{i+1:4d}/{len(combinations)}] Trying: {word}")
+                word_type = "📚" if word in get_persian_words() else "🔤"
+                print(f"[{i+1:4d}/{len(combinations)}] Trying: {word_type} {word}")
 
                 # Step 1: Clear previous input
                 self.click_clear()
@@ -503,9 +544,10 @@ if __name__ == "__main__":
         print("4. Set letters and start brute force")
         print("5. Test coordinates")
         print("6. Quick test word")
-        print("7. Exit")
+        print("7. Test Persian word generation")
+        print("8. Exit")
 
-        choice = input("\nSelect option (1-7): ").strip()
+        choice = input("\nSelect option (1-8): ").strip()
 
         if choice == "1":
             bot.setup_coordinates()
@@ -545,6 +587,33 @@ if __name__ == "__main__":
                 print("❌ Set letters first!")
 
         elif choice == "7":
+            # Test Persian word generation
+            letters = input("\nEnter 7 Persian letters to test word generation: ").strip()
+            if len(letters) == 7:
+                print(f"\n🧪 Testing Persian word generation for letters: {' '.join(letters)}")
+                
+                # Temporarily set letters
+                temp_letters = bot.current_letters
+                bot.current_letters = list(letters)
+                
+                # Generate words
+                words = bot.generate_smart_word_list()
+                
+                # Show first 20 words
+                print(f"\n📝 First 20 words (out of {len(words)} total):")
+                for i, word in enumerate(words[:20], 1):
+                    persian_word_indicator = "📚" if word in get_persian_words() else "🔤"
+                    print(f"{i:2d}. {persian_word_indicator} {word}")
+                
+                if len(words) > 20:
+                    print(f"... and {len(words) - 20} more words")
+                
+                # Restore previous letters
+                bot.current_letters = temp_letters
+            else:
+                print("❌ Please enter exactly 7 letters")
+
+        elif choice == "8":
             print("👋 Goodbye!")
             break
 
@@ -555,5 +624,8 @@ print("\n🎯 Tips for best results:")
 print("- Use delay of 0.2-0.5 seconds between words")
 print("- Make sure Telegram window stays focused")
 print("- Position coordinates accurately")
-print("- The bot will try all possible combinations")
+print("- The bot now prioritizes real Persian words first! 📚")
+print("- Letters can be repeated in words (as requested)")
+print("- Minimum word length is now 3+ letters")
 print("- Press Ctrl+C to stop brute force anytime")
+print("- Use option 7 to test Persian word generation")
